@@ -1,0 +1,5 @@
+{
+  "name": "agent-stash",
+  "version": "0.1.0",
+  "description": "Store and retrieve working memory across Claude Code sessions using Agent Stash"
+}
