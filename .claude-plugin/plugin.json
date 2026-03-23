@@ -1,5 +1,5 @@
 {
-  "name": "agent-stash",
+  "name": "stash",
   "version": "0.1.0",
-  "description": "Store and retrieve working memory across Claude Code sessions using Agent Stash"
+  "description": "Cloud-based working memory for developers and AI agents — store, retrieve, and share named text files across sessions, machines, and agents."
 }
