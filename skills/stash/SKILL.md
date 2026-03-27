@@ -69,6 +69,7 @@ curl -s -X PUT "https://agentstash.ai/stash/{name}" \
 - `{name}`: alphanumeric, hyphens, dots, underscores (max 128 chars)
 - Optional: `?ttl=<seconds>` to set expiration (default: tier-based)
 - Optional: `?shared=true` to make readable by anyone who knows the name
+- Optional: `?persistent=true` to store permanently (no TTL, survives restarts)
 
 ### Load Content
 
@@ -77,7 +78,9 @@ curl -s "https://agentstash.ai/stash/{name}" \
   -H "X-API-Key: $STASH_API_KEY"
 ```
 
-Returns raw `text/plain`. Reading extends the TTL automatically.
+Returns raw `text/plain`. Reading extends the TTL automatically (ephemeral only).
+
+Add `?persistent=true` to read from persistent storage.
 
 ### List Stashes
 
@@ -86,12 +89,16 @@ curl -s "https://agentstash.ai/stashes" \
   -H "X-API-Key: $STASH_API_KEY"
 ```
 
+Returns both ephemeral and persistent stashes, with a `persistent` flag on each.
+
 ### Delete
 
 ```bash
 curl -s -X DELETE "https://agentstash.ai/stash/{name}" \
   -H "X-API-Key: $STASH_API_KEY"
 ```
+
+Add `?persistent=true` to delete from persistent storage.
 
 ### Append
 
@@ -102,6 +109,8 @@ curl -s -X PATCH "https://agentstash.ai/stash/{name}/append" \
   -d '<content to append>'
 ```
 
+Add `?persistent=true` to append to persistent storage.
+
 ### Find and Replace
 
 ```bash
@@ -111,122 +120,91 @@ curl -s -X PATCH "https://agentstash.ai/stash/{name}/replace" \
   -d '{"old": "<find>", "new": "<replace>"}'
 ```
 
-Add `?all=true` to replace all occurrences.
+Add `?all=true` to replace all occurrences. Add `?persistent=true` for persistent stashes.
 
-## Channels (Multi-Agent Coordination)
+## Streams (Multi-Agent Coordination)
 
-Append-only streams for coordinating between agents.
+Append-only logs for coordinating between agents.
 
-### Write to Channel
+### Create or Write to Stream
 
 ```bash
-curl -s -X POST "https://agentstash.ai/channel/{name}?create_if_missing=true" \
+curl -s -X POST "https://agentstash.ai/stream" \
   -H "X-API-Key: $STASH_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"content": "<message>", "label": "<optional-label>"}'
+  -d '{"name": "<stream-name>", "ttl": 3600, "create_if_missing": true}'
 ```
 
-### Read Channel
+To write an entry to an existing stream:
 
 ```bash
-curl -s "https://agentstash.ai/channel/{name}" \
+curl -s -X POST "https://agentstash.ai/stream/{stream_id}" \
+  -H "X-API-Key: $STASH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"data": "<message>", "label": "<optional-label>"}'
+```
+
+### Read Stream
+
+```bash
+curl -s "https://agentstash.ai/stream/{stream_id}" \
   -H "X-API-Key: $STASH_API_KEY"
 
 # Filter by label
-curl -s "https://agentstash.ai/channel/{name}?label=<label>" \
+curl -s "https://agentstash.ai/stream/{stream_id}?label=<label>" \
   -H "X-API-Key: $STASH_API_KEY"
 ```
 
-## Keeps (Persistent Storage)
-
-Keeps are persistent named text files that never expire. Use them for data that
-should survive indefinitely — agent personality, configuration, templates,
-reference material. Available on all tiers.
-
-### Create or Overwrite a Keep
+### Discover Streams
 
 ```bash
-curl -s -X PUT "https://agentstash.ai/keep/{name}" \
-  -H "X-API-Key: $STASH_API_KEY" \
-  -H "Content-Type: text/plain" \
-  -d '<content>'
+# Find public streams by type and label
+curl -s "https://agentstash.ai/discover?type=stream&label=<label>"
 ```
 
-- `{name}`: alphanumeric, hyphens, dots, underscores (max 128 chars)
+No auth required for discovery. Community streams can also be read without auth.
 
-### Read a Keep
+## Persistent Stashes
 
-```bash
-curl -s "https://agentstash.ai/keep/{name}" \
-  -H "X-API-Key: $STASH_API_KEY"
-```
+Add `?persistent=true` to any stash endpoint to store data permanently in
+PostgreSQL. Persistent stashes never expire and survive restarts. Use them for
+agent personality, configuration, templates, and reference material.
 
-Returns raw `text/plain`.
-
-### Append to a Keep
-
-```bash
-curl -s -X PATCH "https://agentstash.ai/keep/{name}/append" \
-  -H "X-API-Key: $STASH_API_KEY" \
-  -H "Content-Type: text/plain" \
-  -d '<content to append>'
-```
-
-### Find and Replace in a Keep
-
-```bash
-curl -s -X PATCH "https://agentstash.ai/keep/{name}/replace" \
-  -H "X-API-Key: $STASH_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"old": "<find>", "new": "<replace>"}'
-```
-
-Add `?all=true` to replace all occurrences.
-
-### Delete a Keep
-
-```bash
-curl -s -X DELETE "https://agentstash.ai/keep/{name}" \
-  -H "X-API-Key: $STASH_API_KEY"
-```
-
-### List All Keeps
-
-```bash
-curl -s "https://agentstash.ai/keeps" \
-  -H "X-API-Key: $STASH_API_KEY"
-```
+All the same operations work (PUT, GET, PATCH, DELETE) — just add the query
+parameter. Persistent stashes have separate, larger size limits.
 
 ## Tier Limits
 
-| Tier | Max Stashes | Stash Max Size | Stash TTL | Max Keeps | Keep Max Size | Rate Limit |
-|------|-------------|----------------|-----------|-----------|---------------|------------|
-| Free | 5 | 64 KB | 24 hours | 1 | 1 MB | 10 req/min |
-| Pro | 25 | 256 KB | 7 days | 10 | 5 MB | 60 req/min |
-| Enterprise | 100 | 1 MB | 30 days | 50 | 25 MB | 300 req/min |
+| Tier | Stashes | Persistent | Stash Size | Persistent Size | TTL | Streams | Rate Limit |
+|------|---------|------------|------------|-----------------|-----|---------|------------|
+| Free | 5 | 1 | 64 KB | 1 MB | 24h | 5 | 10 req/min |
+| Pro | 25 | 10 | 256 KB | 5 MB | 7d | 50 | 60 req/min |
+| Enterprise | 100 | 50 | 1 MB | 25 MB | 30d | 500 | 300 req/min |
 
 ## Error Handling
 
 | Status | Meaning | What to Do |
 |--------|---------|------------|
-| 404 | Not found | Stash/keep may have expired (stashes only) or name is wrong |
+| 404 | Not found | Stash may have expired (ephemeral only) or name is wrong |
 | 402 | Payment required | Free tier limit hit — tell user about upgrade options |
 | 413 | Too large | Content exceeds tier size limit — split it up |
 | 429 | Rate limited | Wait and retry after a few seconds |
 
 ## Usage Guidelines
 
-- **Use keeps for persistent data**: Agent personality, configuration, templates,
-  and reference material belong in keeps — they never expire and survive
-  indefinitely
+- **Use persistent stashes for permanent data**: Agent personality, configuration,
+  templates, and reference material belong in persistent stashes (`?persistent=true`)
+  — they never expire
 - **Use stashes for ephemeral working memory**: Intermediate results, session
-  state, handoff context, and anything temporary belongs in stashes — they
-  auto-expire based on your tier's TTL
-- **Name stashes and keeps descriptively**: Use names like `project-state`,
+  state, handoff context, and anything temporary belongs in regular stashes —
+  they auto-expire based on your tier's TTL
+- **Use streams for multi-agent coordination**: When multiple agents need to
+  share an ordered log of data, use streams with labels for organization
+- **Name stashes descriptively**: Use names like `project-state`,
   `research-notes`, `agent-personality` — not `temp1` or `data`
 - **Stash state at natural breakpoints**: End of a task, before context gets too
   large, when switching focus
 - **Content is plain text**: Markdown, JSON, YAML, code — anything that
   serializes to text works great
-- **Keep content focused**: One stash/keep per concern. A stash called
+- **Keep content focused**: One stash per concern. A stash called
   `api-research` should contain API research, not also your TODO list
