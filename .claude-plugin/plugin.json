@@ -1,5 +1,5 @@
 {
   "name": "stash",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cloud-based working memory for developers and AI agents — store, retrieve, and share named text files across sessions, machines, and agents."
 }
