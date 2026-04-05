@@ -147,6 +147,12 @@ Optional fields in the JSON body:
   `GET /streams?name=...`. Default `false`.
 - `renew_on_access` (bool): Reset the TTL every time the stream is read or
   written. Keeps active streams alive. Default `false`.
+- `overflow` (`"reject"` or `"prune"`): What happens when the stream hits
+  its max entries. `"reject"` (default) returns 409; `"prune"` auto-deletes
+  the oldest entries to make room.
+- `retention_seconds` (int or null): Auto-expire individual entries after
+  this many seconds. `null` (default) means entries live as long as the
+  stream does. Useful for rolling-window data feeds.
 
 ### Write to Stream
 
